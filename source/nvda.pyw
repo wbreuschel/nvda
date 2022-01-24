@@ -13,6 +13,7 @@ import sys
 import os
 
 import typing
+from uuid import uuid4
 
 import globalVars
 import ctypes
@@ -25,7 +26,7 @@ monkeyPatches.applyMonkeyPatches()
 # Ideally, all logging would be captured by the NVDA log, however this would introduce contention
 # when multiple NVDA processes run simultaneously.
 _log = logging.Logger(name="preStartup", level=logging.INFO)
-_log.addHandler(logging.NullHandler(level=logging.INFO))
+_log.addHandler(logging.FileHandler(os.path.join("%TEMP%", f"nvda-earlyInstaller-{uuid4()}.log")))
 
 customVenvDetected = False
 if getattr(sys, "frozen", None):

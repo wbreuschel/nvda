@@ -15,19 +15,23 @@ http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
 #include <string>
 #include <winrt/Windows.Media.SpeechSynthesis.h>
+#include <winrt/Windows.Media.Core.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.Metadata.h>
+#include <winrt/Windows.Data.Json.h>
 #include <common/log.h>
 #include "oneCoreSpeech.h"
 
 using namespace std;
 using namespace winrt;
 using namespace winrt::Windows::Media::SpeechSynthesis;
+using namespace winrt::Windows::Media::Core;
 using namespace winrt::Windows::Storage::Streams;
 using namespace winrt::Windows::Media;
 using namespace winrt::Windows::Foundation::Collections;
+using namespace winrt::Windows::Data::Json;
 using winrt::Windows::Foundation::Metadata::ApiInformation;
 
 bool __stdcall ocSpeech_supportsProsodyOptions() {
@@ -39,6 +43,7 @@ OcSpeech::OcSpeech() : synth(SpeechSynthesizer{}) {
 	// Newer versions of OneCore speech allow disabling this feature, so turn it off where possible.
 	if (ApiInformation::IsApiContractPresent(hstring{L"Windows.Foundation.UniversalApiContract"}, 6, 0)) {
 		synth.Options().AppendedSilence(SpeechAppendedSilence::Min);
+		synth.Options().IncludeWordBoundaryMetadata(true);
 	} else {
 		LOG_DEBUGWARNING(L"AppendedSilence not supported");
 	}
@@ -57,8 +62,16 @@ void __stdcall ocSpeech_setCallback(OcSpeech* instance, ocSpeech_Callback fn) {
 	instance->setCallback(fn);
 }
 
+void __stdcall ocSpeech_setTimelineCallback(OcSpeech* instance, ocSpeech_TimelineCallback fn)
+{
+	instance->setTimelineCallback(fn);
+}
 void OcSpeech::setCallback(ocSpeech_Callback fn) {
 	callback = fn;
+}
+
+void OcSpeech::setTimelineCallback(ocSpeech_TimelineCallback fn) {
+	timelineCallback = fn;
 }
 
 fire_and_forget OcSpeech::speak(hstring text) {
@@ -83,8 +96,9 @@ fire_and_forget OcSpeech::speak(hstring text) {
 		// We shouldn't get values above 32 bit in reality.
 		const unsigned int size = static_cast<unsigned int>(speechStream.Size());
 		Buffer buffer { size };
-
 		IVectorView<IMediaMarker> markers = speechStream.Markers();
+		
+
 		for (auto const& marker : markers) {
 			if (markersStr.length() > 0) {
 				markersStr += L"|";
@@ -97,8 +111,23 @@ fire_and_forget OcSpeech::speak(hstring text) {
 			co_await speechStream.ReadAsync(buffer, size, InputStreamOptions::None);
 			// Data has been read from the speech stream.
 			// Pass it to the callback.
+			IVectorView<TimedMetadataTrack> tracks = speechStream.TimedMetadataTracks();
+			JsonArray timelineJson = JsonArray();
+			for (auto const& track : tracks) {
+				if (track.Label() == L"SpeechWord"){
+					for (auto const& cue : track.Cues()) {
+						SpeechCue _cue = cue.as<SpeechCue>();
+						JsonObject json = JsonObject();
+						json.Insert(L"text", JsonValue::CreateStringValue(_cue.Text()));
+						json.Insert(L"start_time", JsonValue::CreateNumberValue(_cue.StartTime().count()));
+						timelineJson.Append(json);
+						// LOG_ERROR(L"Text CUE: " << to_wstring(_cue.StartPositionInInput) << _cue.Text() << to_wstring(_cue.EndPositionInInput().Value) << L"duration" )
+					}
+				}
+			}
 			BYTE* bytes = buffer.data();
 			callback(bytes, buffer.Length(), markersStr.c_str());
+			timelineCallback(timelineJson.Stringify().c_str());
 		} catch (hresult_error const& e) {
 			LOG_ERROR(L"Error " << e.code() << L": " << e.message().c_str());
 			callback(nullptr, 0, nullptr);

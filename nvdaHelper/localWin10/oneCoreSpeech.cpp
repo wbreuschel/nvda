@@ -39,6 +39,7 @@ bool __stdcall ocSpeech_supportsProsodyOptions() {
 }
 
 OcSpeech::OcSpeech() : synth(SpeechSynthesizer{}) {
+	
 	// By default, OneCore speech appends a  large annoying chunk of silence at the end of every utterance.
 	// Newer versions of OneCore speech allow disabling this feature, so turn it off where possible.
 	if (ApiInformation::IsApiContractPresent(hstring{L"Windows.Foundation.UniversalApiContract"}, 6, 0)) {
@@ -66,12 +67,13 @@ void __stdcall ocSpeech_setTimelineCallback(OcSpeech* instance, ocSpeech_Timelin
 {
 	instance->setTimelineCallback(fn);
 }
-void OcSpeech::setCallback(ocSpeech_Callback fn) {
+void OcSpeech::setCallback(ocSpeech_Callback fn) {	
 	callback = fn;
 }
 
 void OcSpeech::setTimelineCallback(ocSpeech_TimelineCallback fn) {
 	timelineCallback = fn;
+	usesTimeline = true;
 }
 
 fire_and_forget OcSpeech::speak(hstring text) {
@@ -126,8 +128,10 @@ fire_and_forget OcSpeech::speak(hstring text) {
 				}
 			}
 			BYTE* bytes = buffer.data();
+			if(usesTimeline == true){
+				timelineCallback(timelineJson.Stringify().c_str());
+			}
 			callback(bytes, buffer.Length(), markersStr.c_str());
-			timelineCallback(timelineJson.Stringify().c_str());
 		} catch (hresult_error const& e) {
 			LOG_ERROR(L"Error " << e.code() << L": " << e.message().c_str());
 			callback(nullptr, 0, nullptr);

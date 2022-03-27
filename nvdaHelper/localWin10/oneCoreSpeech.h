@@ -24,6 +24,7 @@ private:
 	winrt::Windows::Media::SpeechSynthesis::SpeechSynthesizer synth{ nullptr };
 	ocSpeech_Callback callback;
 	ocSpeech_TimelineCallback timelineCallback;
+	bool usesTimeline = false;
 
 public:
 	OcSpeech();

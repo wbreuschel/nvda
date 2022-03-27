@@ -91,7 +91,7 @@ fire_and_forget OcSpeech::speak(hstring text) {
 			speechStream = co_await synth.SynthesizeSsmlToStreamAsync(text);
 		} catch (hresult_error const& e) {
 			LOG_ERROR(L"Error " << e.code() << L": " << e.message().c_str());
-			callback(nullptr, 0, nullptr, nullptr);
+			callback(nullptr, 0, nullptr);
 			co_return;
 		}
 		// speechStream.Size() is 64 bit, but Buffer can only take 32 bit.
@@ -134,7 +134,7 @@ fire_and_forget OcSpeech::speak(hstring text) {
 			callback(bytes, buffer.Length(), markersStr.c_str());
 		} catch (hresult_error const& e) {
 			LOG_ERROR(L"Error " << e.code() << L": " << e.message().c_str());
-			callback(nullptr, 0, nullptr, nullptr);
+			callback(nullptr, 0, nullptr);
 		}
 	} catch (...) {
 		LOG_ERROR(L"Unexpected error in OcSpeech::speak");

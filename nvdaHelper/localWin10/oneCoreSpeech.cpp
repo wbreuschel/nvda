@@ -45,6 +45,7 @@ OcSpeech::OcSpeech() : synth(SpeechSynthesizer{}) {
 	if (ApiInformation::IsApiContractPresent(hstring{L"Windows.Foundation.UniversalApiContract"}, 6, 0)) {
 		synth.Options().AppendedSilence(SpeechAppendedSilence::Min);
 		synth.Options().IncludeWordBoundaryMetadata(true);
+		synth.Options().IncludeSentenceBoundaryMetadata(true);
 	} else {
 		LOG_DEBUGWARNING(L"AppendedSilence not supported");
 	}
@@ -114,7 +115,15 @@ fire_and_forget OcSpeech::speak(hstring text) {
 			// Data has been read from the speech stream.
 			// Pass it to the callback.
 			IVectorView<TimedMetadataTrack> tracks = speechStream.TimedMetadataTracks();
-			JsonArray timelineJson = JsonArray();
+			JsonObject timelineJson = JsonObject();
+			JsonArray words = JsonArray();
+			JsonArray sentences = JsonArray();
+			JsonArray bookmarks = JsonArray();
+			timelineJson.Insert(L"words", words);
+			timelineJson.Insert(L"sentences", sentences);
+			timelineJson.Insert(L"bookmarks", bookmarks);
+			timelineJson.Insert(L"text", JsonValue::CreateStringValue(text));
+
 			for (auto const& track : tracks) {
 				if (track.Label() == L"SpeechWord"){
 					for (auto const& cue : track.Cues()) {
@@ -122,7 +131,29 @@ fire_and_forget OcSpeech::speak(hstring text) {
 						JsonObject json = JsonObject();
 						json.Insert(L"text", JsonValue::CreateStringValue(_cue.Text()));
 						json.Insert(L"start_time", JsonValue::CreateNumberValue(_cue.StartTime().count()));
-						timelineJson.Append(json);
+						json.Insert(L"StartPositionInInput", JsonValue::CreateNumberValue((double)_cue.StartPositionInInput().Value()));
+						json.Insert(L"EndPositionInInput", JsonValue::CreateNumberValue((double)_cue.EndPositionInInput().Value()));
+						words.Append(json);
+						// LOG_ERROR(L"Text CUE: " << to_wstring(_cue.StartPositionInInput) << _cue.Text() << to_wstring(_cue.EndPositionInInput().Value) << L"duration" )
+					}
+				}
+				if (track.Label() == L"SpeechSentence"){
+					for (auto const& cue : track.Cues()) {
+						SpeechCue _cue = cue.as<SpeechCue>();
+						JsonObject json = JsonObject();
+						json.Insert(L"text", JsonValue::CreateStringValue(_cue.Text()));
+						json.Insert(L"start_time", JsonValue::CreateNumberValue(_cue.StartTime().count()));
+						sentences.Append(json);
+						// LOG_ERROR(L"Text CUE: " << to_wstring(_cue.StartPositionInInput) << _cue.Text() << to_wstring(_cue.EndPositionInInput().Value) << L"duration" )
+					}
+				}
+				if (track.Label() == L"SpeechBookmark"){
+					for (auto const& cue : track.Cues()) {
+						SpeechCue _cue = cue.as<SpeechCue>();
+						JsonObject json = JsonObject();
+						json.Insert(L"text", JsonValue::CreateStringValue(_cue.Text()));
+						json.Insert(L"start_time", JsonValue::CreateNumberValue(_cue.StartTime().count()));
+						bookmarks.Append(json);
 						// LOG_ERROR(L"Text CUE: " << to_wstring(_cue.StartPositionInInput) << _cue.Text() << to_wstring(_cue.EndPositionInInput().Value) << L"duration" )
 					}
 				}

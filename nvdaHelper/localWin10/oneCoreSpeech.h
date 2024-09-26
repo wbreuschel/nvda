@@ -17,16 +17,20 @@ http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 #define export __declspec(dllexport)
 
 typedef void (*ocSpeech_Callback)(byte* data, int length, const wchar_t* markers);
+typedef void (*ocSpeech_TimelineCallback)(const wchar_t* jsonTimeline);
 
 class OcSpeech {
 private:
 	winrt::Windows::Media::SpeechSynthesis::SpeechSynthesizer synth{ nullptr };
 	ocSpeech_Callback callback;
+	ocSpeech_TimelineCallback timelineCallback;
+	bool usesTimeline = false;
 
 public:
 	OcSpeech();
 	winrt::fire_and_forget speak(winrt::hstring text);
-	void setCallback(ocSpeech_Callback fn);
+	void setCallback(ocSpeech_Callback fn);	
+	void setTimelineCallback(ocSpeech_TimelineCallback fn);
 	std::wstring getVoices();
 	winrt::hstring getCurrentVoiceId();
 	void setVoice(int index);
@@ -44,6 +48,7 @@ extern "C" {
 	export OcSpeech* __stdcall ocSpeech_initialize();
 	export void __stdcall ocSpeech_terminate(OcSpeech* instance);
 	export void __stdcall ocSpeech_setCallback(OcSpeech* instance, ocSpeech_Callback fn);
+	export void __stdcall ocSpeech_setTimelineCallback(OcSpeech* instance, ocSpeech_TimelineCallback fn);
 	export void __stdcall ocSpeech_speak(OcSpeech* instance, wchar_t* text);
 	export BSTR __stdcall ocSpeech_getVoices(OcSpeech* instance);
 	export const wchar_t* __stdcall ocSpeech_getCurrentVoiceId(OcSpeech* instance);
